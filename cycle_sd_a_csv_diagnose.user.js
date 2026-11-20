@@ -7,8 +7,8 @@
 // @author       Akshay(akparaks)
 // @run-at       document-idle
 // @grant        GM_setClipboard
-// @updateURL    https://raw.githubusercontent.com/<USER>/<REPO>/<BRANCH>/cycle_sd_a_csv_diagnose.user.js
-// @downloadURL  https://raw.githubusercontent.com/<USER>/<REPO>/<BRANCH>/cycle_sd_a_csv_diagnose.user.js
+// @updateURL    https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js
+// @downloadURL  https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js
 // ==/UserScript==
 
 (function () {
