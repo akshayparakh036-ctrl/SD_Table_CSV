@@ -3,7 +3,8 @@
 // @namespace    local.tools.cycle_sd
 // @version      0.2.0
 // @description  Click a dot to choose cycle_sd_b/cycle_sd_c/cycle_sd_d, download matching tables as CSV, then remove injected UI.
-// @match        *://*/*
+// @match        *://logistics.amazon.co.uk/internal/*
+// @author       Akshay(akparaks)
 // @run-at       document-idle
 // @grant        GM_setClipboard
 // @updateURL    https://raw.githubusercontent.com/<USER>/<REPO>/<BRANCH>/cycle_sd_a_csv_diagnose.user.js
