@@ -1,14 +1,14 @@
 // ==UserScript==
 // @name         cycle_sd CSV Dot Downloader
 // @namespace    local.tools.cycle_sd
-// @version      0.2.0
+// @version      1.2
 // @description  Click a dot to choose cycle_sd_b/cycle_sd_c/cycle_sd_d, download matching tables as CSV, then remove injected UI.
 // @match        *://logistics.amazon.co.uk/internal/*
 // @author       Akshay(akparaks)
 // @run-at       document-idle
 // @grant        GM_setClipboard
-// @updateURL    https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js
-// @downloadURL  https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js
+// @updateURL    https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=1.2
+// @downloadURL  https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=1.2
 // ==/UserScript==
 
 (function () {
