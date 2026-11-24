@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         cycle_sd CSV Dot Downloader
 // @namespace    local.tools.cycle_sd
-// @version      2.5
-// @description  Click a dot to pick any discovered table by its title and download it as CSV. Includes a forced self-update watchdog.
+// @version      2.6
+// @description  Click a dot to open a full-screen list of tables by title and download CSVs. Includes a forced self-update watchdog.
 // @match        *://logistics.amazon.co.uk/internal/*
 // @author       Akshay(akparaks)
 // @run-at       document-idle
@@ -12,8 +12,8 @@
 // @grant        GM_notification
 // @grant        GM_registerMenuCommand
 // @connect      raw.githubusercontent.com
-// @updateURL    https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=2.5
-// @downloadURL  https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=2.5
+// @updateURL    https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=2.6
+// @downloadURL  https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=2.6
 // ==/UserScript==
 
 (function () {
@@ -24,6 +24,7 @@
   const ROOT_ID = 'cycle-sd-dot-root';
   const UPDATE_URL = 'https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js';
   let updatePrompted = false;
+  let modalKeyHandler = null;
 
   function versionParts(v) {
     return String(v || '0').split(/[.\-_]/).map(p => parseInt(p, 10) || 0);
@@ -434,70 +435,135 @@
   function closeChooser() {
     const chooser = document.getElementById('cycle-sd-dot-chooser');
     if (chooser) chooser.remove();
+    if (modalKeyHandler) {
+      document.removeEventListener('keydown', modalKeyHandler);
+      modalKeyHandler = null;
+    }
+    document.body.style.overflow = '';
   }
 
   function showChooser() {
     closeChooser();
     const entries = discoverTableEntries();
-    const children = [
-      el('div', { style: { fontWeight: 'bold', marginBottom: '6px' } }, [`Tables found (${entries.length}) — click a title to download CSV`]),
-    ];
+
+    const grid = el('div', {
+      style: {
+        padding: '18px',
+        overflowY: 'auto',
+        flex: '1',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+        gap: '10px',
+        alignContent: 'start',
+      },
+    });
 
     if (!entries.length) {
-      children.push(el('div', { style: { color: '#666', lineHeight: '1.4' } }, ['No tables found on this page.']));
+      grid.appendChild(el('div', {
+        style: { gridColumn: '1 / -1', color: '#666', fontSize: '14px' },
+      }, ['No tables found on this page.']));
     } else {
-      children.push(el('button', {
-        type: 'button',
-        style: {
-          display: 'block', width: '100%', margin: '4px 0', padding: '4px 8px', cursor: 'pointer',
-          background: '#eef5ff', border: '1px solid #9dc1ef', borderRadius: '4px', textAlign: 'left',
-        },
-        onclick: () => {
-          closeChooser();
-          downloadAll(entries);
-        },
-      }, [`Download all CSVs (${entries.length})`]));
-
       for (const item of entries) {
         const rows = item.table.rows ? item.table.rows.length : 0;
-        const tip = [item.target, item.label, rows ? `${rows} rows` : ''].filter(Boolean).join(' — ');
-        children.push(el('button', {
+        const meta = [item.target, rows ? `${rows} rows` : ''].filter(Boolean).join(' • ') || 'CSV';
+        grid.appendChild(el('button', {
           type: 'button',
-          title: tip,
+          title: `${item.label}${item.target ? ` — ${item.target}` : ''}`,
           style: {
-            display: 'block', width: '100%', margin: '4px 0', padding: '5px 8px', cursor: 'pointer', textAlign: 'left',
-            background: '#fff', border: '1px solid #ccc', borderRadius: '4px',
+            display: 'block', width: '100%', minHeight: '58px', padding: '12px 14px', cursor: 'pointer',
+            textAlign: 'left', background: '#fff', border: '1px solid #d0d7de', borderRadius: '8px',
+            font: '14px Arial, sans-serif',
           },
           onclick: () => {
             closeChooser();
             downloadTable(item.table, item.label, item.target);
           },
-        }, [item.label]));
+        }, [
+          el('div', { style: { fontWeight: 'bold', marginBottom: '4px', wordBreak: 'break-word' } }, [item.label]),
+          el('div', { style: { fontSize: '11px', color: '#666' } }, [meta]),
+        ]));
       }
     }
 
-    const chooser = el('div', {
+    const modal = el('div', {
+      style: {
+        width: 'min(900px, 92vw)',
+        height: 'min(85vh, 760px)',
+        maxHeight: '92vh',
+        background: '#fff',
+        borderRadius: '12px',
+        boxShadow: '0 12px 40px rgba(0,0,0,.35)',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      },
+    }, [
+      el('div', {
+        style: {
+          position: 'relative', padding: '16px 18px', borderBottom: '1px solid #ddd',
+          background: '#f7f9fc', flexShrink: '0',
+        },
+      }, [
+        el('div', { style: { fontSize: '18px', fontWeight: 'bold' } }, ['Tables on this page']),
+        el('div', { style: { fontSize: '12px', color: '#555', marginTop: '4px' } }, [`${entries.length} table(s) found — click a title to download its CSV`]),
+        el('button', {
+          type: 'button',
+          title: 'Close',
+          style: {
+            position: 'absolute', right: '14px', top: '12px', width: '32px', height: '32px',
+            fontSize: '20px', lineHeight: '1', cursor: 'pointer', border: '1px solid #ccc',
+            borderRadius: '6px', background: '#fff',
+          },
+          onclick: closeChooser,
+        }, ['×']),
+      ]),
+      grid,
+      el('div', {
+        style: {
+          padding: '12px 18px', borderTop: '1px solid #ddd', background: '#f7f9fc',
+          display: 'flex', gap: '10px', alignItems: 'center', flexShrink: '0',
+        },
+      }, [
+        el('button', {
+          type: 'button',
+          style: {
+            padding: '9px 16px', cursor: 'pointer', background: '#1e88e5', color: '#fff',
+            border: '1px solid #166bb5', borderRadius: '6px', fontWeight: 'bold',
+          },
+          onclick: () => {
+            if (entries.length) {
+              closeChooser();
+              downloadAll(entries);
+            }
+          },
+        }, [`Download all CSVs (${entries.length})`]),
+        el('button', {
+          type: 'button',
+          style: { padding: '9px 16px', cursor: 'pointer', background: '#fff', border: '1px solid #ccc', borderRadius: '6px' },
+          onclick: closeChooser,
+        }, ['Close']),
+      ]),
+    ]);
+
+    let overlay;
+    overlay = el('div', {
       id: 'cycle-sd-dot-chooser',
       style: {
-        position: 'fixed',
-        right: '14px',
-        bottom: '48px',
-        zIndex: '2147483647',
-        background: '#fff',
-        color: '#111',
-        border: '1px solid #bbb',
-        borderRadius: '8px',
-        boxShadow: '0 4px 14px rgba(0,0,0,.2)',
-        padding: '8px',
-        font: '12px Arial, sans-serif',
-        minWidth: '260px',
-        maxWidth: '320px',
-        maxHeight: '70vh',
-        overflowY: 'auto',
-      }
-    }, children);
+        position: 'fixed', inset: '0', zIndex: '2147483647',
+        background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        font: '14px Arial, sans-serif',
+      },
+      onclick: (e) => {
+        if (e.target === overlay) closeChooser();
+      },
+    }, [modal]);
 
-    document.documentElement.appendChild(chooser);
+    modalKeyHandler = (e) => {
+      if (e.key === 'Escape') closeChooser();
+    };
+    document.addEventListener('keydown', modalKeyHandler);
+    document.body.style.overflow = 'hidden';
+    document.documentElement.appendChild(overlay);
   }
 
   function createDot() {
