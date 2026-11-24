@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cycle_sd CSV Dot Downloader
 // @namespace    local.tools.cycle_sd
-// @version      2.0
+// @version      2.5
 // @description  Click a dot to pick any discovered table by its title and download it as CSV. Includes a forced self-update watchdog.
 // @match        *://logistics.amazon.co.uk/internal/*
 // @author       Akshay(akparaks)
@@ -12,8 +12,8 @@
 // @grant        GM_notification
 // @grant        GM_registerMenuCommand
 // @connect      raw.githubusercontent.com
-// @updateURL    https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=2.0
-// @downloadURL  https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=2.0
+// @updateURL    https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=2.5
+// @downloadURL  https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=2.5
 // ==/UserScript==
 
 (function () {
@@ -508,10 +508,10 @@
       'aria-label': 'Download cycle_sd CSV',
       style: {
         position: 'fixed',
-        right: '16px',
-        bottom: '16px',
-        width: '18px',
-        height: '18px',
+        right: '80px',
+        bottom: '50px',
+        width: '25px',
+        height: '25px',
         borderRadius: '50%',
         border: '1px solid #333',
         background: '#1e88e5',
