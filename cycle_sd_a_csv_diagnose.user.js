@@ -1,17 +1,19 @@
 // ==UserScript==
 // @name         cycle_sd CSV Dot Downloader
 // @namespace    local.tools.cycle_sd
-// @version      1.8
-// @description  Click a dot to pick any discovered table by its title and download it as CSV. Includes a self-update watchdog.
+// @version      2.0
+// @description  Click a dot to pick any discovered table by its title and download it as CSV. Includes a forced self-update watchdog.
 // @match        *://logistics.amazon.co.uk/internal/*
 // @author       Akshay(akparaks)
 // @run-at       document-idle
 // @grant        GM_setClipboard
 // @grant        GM_xmlhttpRequest
 // @grant        GM_openInTab
+// @grant        GM_notification
+// @grant        GM_registerMenuCommand
 // @connect      raw.githubusercontent.com
-// @updateURL    https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=1.8
-// @downloadURL  https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=1.8
+// @updateURL    https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=2.0
+// @downloadURL  https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=2.0
 // ==/UserScript==
 
 (function () {
@@ -21,6 +23,7 @@
   const TARGETS = ['cycle_sd_a', 'cycle_sd_b', 'cycle_sd_c', 'cycle_sd_d'];
   const ROOT_ID = 'cycle-sd-dot-root';
   const UPDATE_URL = 'https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js';
+  let updatePrompted = false;
 
   function versionParts(v) {
     return String(v || '0').split(/[.\-_]/).map(p => parseInt(p, 10) || 0);
@@ -38,8 +41,9 @@
     return false;
   }
 
-  // Force an update check on every page load instead of waiting for Tampermonkey's schedule.
+  // Forced update: on load, every 10 minutes, and via the Tampermonkey menu.
   function checkForUpdate() {
+    if (updatePrompted) return;
     if (typeof GM_xmlhttpRequest !== 'function' || typeof GM_openInTab !== 'function') return;
     const current = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '0';
     GM_xmlhttpRequest({
@@ -53,7 +57,12 @@
         if (!m) return;
         const remote = m[1];
         if (!isNewerVersion(remote, current)) return;
-        console.log(`[cycle_sd updater] New version ${remote} found (installed ${current}). Opening update page.`);
+        updatePrompted = true;
+        const message = `New version ${remote} found (installed ${current}). Opening the installer.`;
+        console.log(`[cycle_sd updater] ${message}`);
+        if (typeof GM_notification === 'function') {
+          GM_notification({ title: 'cycle_sd CSV Dot Downloader update', text: message, timeout: 8000 });
+        }
         GM_openInTab(UPDATE_URL + '?v=' + encodeURIComponent(remote), { active: true });
       },
       onerror: function () {},
@@ -526,6 +535,10 @@
   function boot() {
     createDot();
     checkForUpdate();
+    setInterval(checkForUpdate, 10 * 60 * 1000);
+    if (typeof GM_registerMenuCommand === 'function') {
+      GM_registerMenuCommand('Force cycle_sd update check', checkForUpdate);
+    }
   }
 
   if (document.readyState === 'loading') {
