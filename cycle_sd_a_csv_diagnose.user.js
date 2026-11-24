@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         cycle_sd CSV Dot Downloader (TEST - no watchdog)
-// @namespace    local.tools.cycle_sd.test
+// @namespace    local.tools.cycle_sd
 // @version      1.6.0
 // @description  Test copy: table-title buttons download individual CSVs. No auto-update watchdog.
 // @match        *://logistics.amazon.co.uk/internal/*
