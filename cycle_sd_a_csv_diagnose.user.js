@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cycle_sd CSV Dot Downloader
 // @namespace    local.tools.cycle_sd
-// @version      1.3
+// @version      1.5
 // @description  Click a dot to pick any discovered table by its title (cycle_sd_a-d tables plus all other tables) and download it as CSV.
 // @match       *://logistics.amazon.co.uk/internal/*
 // @author       Akshay(akparaks)
