@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cycle_sd CSV Dot Downloader
 // @namespace    local.tools.cycle_sd
-// @version      2.6
+// @version      2.7
 // @description  Click a dot to open a full-screen list of tables by title and download CSVs. Includes a forced self-update watchdog.
 // @match        *://logistics.amazon.co.uk/internal/*
 // @author       Akshay(akparaks)
@@ -12,8 +12,8 @@
 // @grant        GM_notification
 // @grant        GM_registerMenuCommand
 // @connect      raw.githubusercontent.com
-// @updateURL    https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=2.6
-// @downloadURL  https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=2.6
+// @updateURL    https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=2.7
+// @downloadURL  https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=2.7
 // ==/UserScript==
 
 (function () {
@@ -446,43 +446,80 @@
     closeChooser();
     const entries = discoverTableEntries();
 
-    const grid = el('div', {
+    // Tables whose label starts with "Table" are kept behind an off-by-default toggle.
+    const titled = entries.filter(item => !/^table\b/i.test(item.label));
+    const fallback = entries.filter(item => /^table\b/i.test(item.label));
+
+    function tableButton(item) {
+      const rows = item.table.rows ? item.table.rows.length : 0;
+      const meta = [item.target, rows ? `${rows} rows` : ''].filter(Boolean).join(' • ') || 'CSV';
+      return el('button', {
+        type: 'button',
+        title: `${item.label}${item.target ? ` — ${item.target}` : ''}`,
+        style: {
+          display: 'block', width: '100%', minHeight: '58px', padding: '12px 14px', cursor: 'pointer',
+          textAlign: 'left', background: '#fff', border: '1px solid #d0d7de', borderRadius: '8px',
+          font: '14px Arial, sans-serif',
+        },
+        onclick: () => {
+          closeChooser();
+          downloadTable(item.table, item.label, item.target);
+        },
+      }, [
+        el('div', { style: { fontWeight: 'bold', marginBottom: '4px', wordBreak: 'break-word' } }, [item.label]),
+        el('div', { style: { fontSize: '11px', color: '#666' } }, [meta]),
+      ]);
+    }
+
+    const content = el('div', {
+      style: { padding: '18px', overflowY: 'auto', flex: '1' },
+    });
+
+    const namedGrid = el('div', {
       style: {
-        padding: '18px',
-        overflowY: 'auto',
-        flex: '1',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-        gap: '10px',
-        alignContent: 'start',
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+        gap: '10px', alignContent: 'start',
       },
     });
 
     if (!entries.length) {
-      grid.appendChild(el('div', {
+      namedGrid.appendChild(el('div', {
         style: { gridColumn: '1 / -1', color: '#666', fontSize: '14px' },
       }, ['No tables found on this page.']));
+    } else if (!titled.length) {
+      namedGrid.appendChild(el('div', {
+        style: { gridColumn: '1 / -1', color: '#666', fontSize: '14px' },
+      }, ['No titled tables found. Use the toggle below to show the "Table" entries.']));
     } else {
-      for (const item of entries) {
-        const rows = item.table.rows ? item.table.rows.length : 0;
-        const meta = [item.target, rows ? `${rows} rows` : ''].filter(Boolean).join(' • ') || 'CSV';
-        grid.appendChild(el('button', {
-          type: 'button',
-          title: `${item.label}${item.target ? ` — ${item.target}` : ''}`,
-          style: {
-            display: 'block', width: '100%', minHeight: '58px', padding: '12px 14px', cursor: 'pointer',
-            textAlign: 'left', background: '#fff', border: '1px solid #d0d7de', borderRadius: '8px',
-            font: '14px Arial, sans-serif',
-          },
-          onclick: () => {
-            closeChooser();
-            downloadTable(item.table, item.label, item.target);
-          },
-        }, [
-          el('div', { style: { fontWeight: 'bold', marginBottom: '4px', wordBreak: 'break-word' } }, [item.label]),
-          el('div', { style: { fontSize: '11px', color: '#666' } }, [meta]),
-        ]));
-      }
+      titled.forEach(item => namedGrid.appendChild(tableButton(item)));
+    }
+    content.appendChild(namedGrid);
+
+    if (fallback.length) {
+      const fallbackGrid = el('div', {
+        style: {
+          display: 'none', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+          gap: '10px', marginTop: '10px', alignContent: 'start',
+        },
+      });
+      fallback.forEach(item => fallbackGrid.appendChild(tableButton(item)));
+
+      const toggle = el('button', {
+        type: 'button',
+        style: {
+          width: '100%', marginTop: '16px', padding: '10px 14px', cursor: 'pointer', textAlign: 'left',
+          background: '#eef5ff', border: '1px solid #9dc1ef', borderRadius: '8px', fontWeight: 'bold',
+        },
+      }, [`Show "Table" entries (${fallback.length}) — OFF`]);
+
+      toggle.addEventListener('click', () => {
+        const isOpen = fallbackGrid.style.display !== 'none';
+        fallbackGrid.style.display = isOpen ? 'none' : 'grid';
+        toggle.textContent = `${isOpen ? 'Show' : 'Hide'} "Table" entries (${fallback.length}) — ${isOpen ? 'OFF' : 'ON'}`;
+      });
+
+      content.appendChild(toggle);
+      content.appendChild(fallbackGrid);
     }
 
     const modal = el('div', {
@@ -505,7 +542,9 @@
         },
       }, [
         el('div', { style: { fontSize: '18px', fontWeight: 'bold' } }, ['Tables on this page']),
-        el('div', { style: { fontSize: '12px', color: '#555', marginTop: '4px' } }, [`${entries.length} table(s) found — click a title to download its CSV`]),
+        el('div', { style: { fontSize: '12px', color: '#555', marginTop: '4px' } }, [fallback.length
+          ? `${entries.length} table(s) found — ${fallback.length} "Table" entr${fallback.length === 1 ? 'y is' : 'ies are'} hidden by default`
+          : `${entries.length} table(s) found — click a title to download its CSV`]),
         el('button', {
           type: 'button',
           title: 'Close',
@@ -517,7 +556,7 @@
           onclick: closeChooser,
         }, ['×']),
       ]),
-      grid,
+      content,
       el('div', {
         style: {
           padding: '12px 18px', borderTop: '1px solid #ddd', background: '#f7f9fc',
