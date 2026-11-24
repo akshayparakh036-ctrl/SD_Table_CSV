@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cycle_sd CSV Dot Downloader
 // @namespace    local.tools.cycle_sd
-// @version      1.7
+// @version      1.8
 // @description  Click a dot to pick any discovered table by its title and download it as CSV. Includes a self-update watchdog.
 // @match        *://logistics.amazon.co.uk/internal/*
 // @author       Akshay(akparaks)
@@ -10,8 +10,8 @@
 // @grant        GM_xmlhttpRequest
 // @grant        GM_openInTab
 // @connect      raw.githubusercontent.com
-// @updateURL    https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=1.7
-// @downloadURL  https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=1.7
+// @updateURL    https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=1.8
+// @downloadURL  https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=1.8
 // ==/UserScript==
 
 (function () {
@@ -54,7 +54,7 @@
         const remote = m[1];
         if (!isNewerVersion(remote, current)) return;
         console.log(`[cycle_sd updater] New version ${remote} found (installed ${current}). Opening update page.`);
-        GM_openInTab(UPDATE_URL + '?v=' + encodeURIComponent(remote), { active: false });
+        GM_openInTab(UPDATE_URL + '?v=' + encodeURIComponent(remote), { active: true });
       },
       onerror: function () {},
       ontimeout: function () {},
