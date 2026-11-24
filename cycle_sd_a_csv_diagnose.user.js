@@ -1,14 +1,14 @@
 // ==UserScript==
 // @name         cycle_sd CSV Dot Downloader
 // @namespace    local.tools.cycle_sd
-// @version      1.2
-// @description  Click a dot to choose cycle_sd_b/cycle_sd_c/cycle_sd_d, download matching tables as CSV, then remove injected UI.
-// @match        *://logistics.amazon.co.uk/internal/*
+// @version      1.3
+// @description  Click a dot to pick any discovered table by its title (cycle_sd_a-d tables plus all other tables) and download it as CSV.
+// @match       *://logistics.amazon.co.uk/internal/*
 // @author       Akshay(akparaks)
 // @run-at       document-idle
 // @grant        GM_setClipboard
-// @updateURL    https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=1.2
-// @downloadURL  https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=1.2
+// @updateURL    https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=1.5
+// @downloadURL  https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=1.5
 // ==/UserScript==
 
 (function () {
@@ -44,6 +44,14 @@
   function textOf(node) {
     if (!node) return '';
     return (node.innerText ?? node.textContent ?? '').replace(/\s+/g, ' ').trim();
+  }
+
+  function cleanLabel(value) {
+    return String(value ?? '').replace(/\s+/g, ' ').trim();
+  }
+
+  function safeFileName(value) {
+    return cleanLabel(value).replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, '_').slice(0, 80) || 'table';
   }
 
   function cssPath(node, maxDepth = 5) {
@@ -139,7 +147,7 @@
     if (byId) candidates.push(byId);
 
     try {
-      document.querySelectorAll(`[id*="${target}" i], [name*="${target}" i], [class*="${target}" i], [data-id*="${target}" i], [data-name*="${target}" i]`).forEach(n => candidates.push(n));
+      document.querySelectorAll(`[id*="${target}" i], [name*="${target}" i], [class*="${target}" i], [data-id*="${target}" i], [data-name*="${target}" i], [title*="${target}" i], [aria-label*="${target}" i]`).forEach(n => candidates.push(n));
     } catch (_) {}
 
     try {
@@ -151,7 +159,9 @@
         const id = (n.id || '').toLowerCase();
         const cls = (typeof n.className === 'string' ? n.className : '').toLowerCase();
         const name = (n.getAttribute && (n.getAttribute('name') || '')).toLowerCase();
-        if (id.includes(t) || cls.includes(t) || name.includes(t)) candidates.push(n);
+        const title = (n.getAttribute && (n.getAttribute('title') || '')).toLowerCase();
+        const aria = (n.getAttribute && (n.getAttribute('aria-label') || '')).toLowerCase();
+        if (id.includes(t) || cls.includes(t) || name.includes(t) || title.includes(t) || aria.includes(t)) candidates.push(n);
       }
     } catch (_) {}
 
@@ -179,6 +189,8 @@
           tbl.id,
           tbl.className,
           tbl.getAttribute && tbl.getAttribute('name'),
+          tbl.getAttribute && tbl.getAttribute('title'),
+          tbl.getAttribute && tbl.getAttribute('data-title'),
           tbl.getAttribute && tbl.getAttribute('aria-label'),
           textOf(tbl.caption),
           textOf(tbl.closest ? tbl.closest('section,div,article,main') : null).slice(0, 400)
@@ -280,6 +292,81 @@
     return true;
   }
 
+  function tableTitle(table, fallbackIndex) {
+    if (!table) return `Table ${fallbackIndex}`;
+
+    const candidates = [
+      cleanLabel(table.getAttribute && table.getAttribute('title')),
+      cleanLabel(table.caption && textOf(table.caption)),
+      cleanLabel(table.getAttribute && table.getAttribute('aria-label')),
+      cleanLabel(table.getAttribute && table.getAttribute('data-title')),
+      cleanLabel(table.getAttribute && table.getAttribute('name')),
+    ];
+
+    // A nearby heading is often the visible "title" of a table.
+    let sibling = table.previousElementSibling;
+    for (let i = 0; i < 3 && sibling; i++) {
+      if (/^H[1-6]$/.test(sibling.tagName) || sibling.getAttribute('role') === 'heading') {
+        candidates.push(cleanLabel(textOf(sibling)));
+        break;
+      }
+      sibling = sibling.previousElementSibling;
+    }
+
+    const titledAncestor = table.closest ? table.closest('[title], [aria-label]') : null;
+    if (titledAncestor) {
+      candidates.push(cleanLabel(titledAncestor.getAttribute('title')));
+      candidates.push(cleanLabel(titledAncestor.getAttribute('aria-label')));
+    }
+
+    return candidates.find(Boolean) || `Table ${fallbackIndex}`;
+  }
+
+  // Discover cycle_sd_a-d tables first, then every remaining table, listed individually by title.
+  function discoverTableEntries() {
+    const entries = [];
+    const seen = new Set();
+
+    function add(table, target) {
+      if (!table || seen.has(table)) return;
+      seen.add(table);
+      entries.push({ table, label: tableTitle(table, entries.length + 1), target });
+    }
+
+    for (const target of TARGETS) {
+      findTargetTables(target).forEach(table => add(table, target));
+    }
+    document.querySelectorAll('table').forEach(table => add(table, ''));
+
+    return entries;
+  }
+
+  function downloadTable(table, label, target) {
+    const matrix = getTableMatrix(table);
+    if (!matrix.length) {
+      alert(`Table '${label}' is empty.`);
+      return false;
+    }
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const base = [target, safeFileName(label)].filter(Boolean).join('_');
+    downloadText(`${base}_${stamp}.csv`, matrixToCsv(matrix));
+    return true;
+  }
+
+  function downloadAll(entries) {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    let exported = 0;
+    entries.forEach((item, i) => {
+      const matrix = getTableMatrix(item.table);
+      if (!matrix.length) return;
+      const base = [item.target, safeFileName(item.label)].filter(Boolean).join('_');
+      downloadText(`${String(i + 1).padStart(2, '0')}_${base}_${stamp}.csv`, matrixToCsv(matrix));
+      exported++;
+    });
+    if (!exported) alert('No non-empty tables found.');
+    return exported > 0;
+  }
+
   async function diagnoseForTarget(target) {
     const diag = buildDiagnostics(target);
     const json = JSON.stringify(diag, null, 2);
@@ -299,6 +386,44 @@
 
   function showChooser() {
     closeChooser();
+    const entries = discoverTableEntries();
+    const children = [
+      el('div', { style: { fontWeight: 'bold', marginBottom: '6px' } }, [`Tables found (${entries.length}) — click a title to download CSV`]),
+    ];
+
+    if (!entries.length) {
+      children.push(el('div', { style: { color: '#666', lineHeight: '1.4' } }, ['No tables found on this page.']));
+    } else {
+      children.push(el('button', {
+        type: 'button',
+        style: {
+          display: 'block', width: '100%', margin: '4px 0', padding: '4px 8px', cursor: 'pointer',
+          background: '#eef5ff', border: '1px solid #9dc1ef', borderRadius: '4px', textAlign: 'left',
+        },
+        onclick: () => {
+          closeChooser();
+          downloadAll(entries);
+        },
+      }, [`Download all CSVs (${entries.length})`]));
+
+      for (const item of entries) {
+        const rows = item.table.rows ? item.table.rows.length : 0;
+        const tip = [item.target, item.label, rows ? `${rows} rows` : ''].filter(Boolean).join(' — ');
+        children.push(el('button', {
+          type: 'button',
+          title: tip,
+          style: {
+            display: 'block', width: '100%', margin: '4px 0', padding: '5px 8px', cursor: 'pointer', textAlign: 'left',
+            background: '#fff', border: '1px solid #ccc', borderRadius: '4px',
+          },
+          onclick: () => {
+            closeChooser();
+            downloadTable(item.table, item.label, item.target);
+          },
+        }, [item.label]));
+      }
+    }
+
     const chooser = el('div', {
       id: 'cycle-sd-dot-chooser',
       style: {
@@ -313,19 +438,12 @@
         boxShadow: '0 4px 14px rgba(0,0,0,.2)',
         padding: '8px',
         font: '12px Arial, sans-serif',
-        minWidth: '170px',
+        minWidth: '260px',
+        maxWidth: '320px',
+        maxHeight: '70vh',
+        overflowY: 'auto',
       }
-    }, [
-      el('div', { style: { fontWeight: 'bold', marginBottom: '6px' } }, ['Download CSV for:']),
-      ...TARGETS.map(t => el('button', {
-        type: 'button',
-        style: { display: 'block', width: '100%', margin: '4px 0', padding: '5px 8px', cursor: 'pointer' },
-        onclick: () => {
-          closeChooser();
-          downloadForTarget(t);
-        }
-      }, [t])),
-    ]);
+    }, children);
 
     document.documentElement.appendChild(chooser);
   }
