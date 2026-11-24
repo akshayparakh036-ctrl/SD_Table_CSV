@@ -1,14 +1,17 @@
 // ==UserScript==
 // @name         cycle_sd CSV Dot Downloader
 // @namespace    local.tools.cycle_sd
-// @version      1.5
-// @description  Click a dot to pick any discovered table by its title (cycle_sd_a-d tables plus all other tables) and download it as CSV.
-// @match       *://logistics.amazon.co.uk/internal/*
+// @version      1.6
+// @description  Click a dot to pick any discovered table by its title and download it as CSV. Includes a self-update watchdog.
+// @match        *://logistics.amazon.co.uk/internal/*
 // @author       Akshay(akparaks)
 // @run-at       document-idle
 // @grant        GM_setClipboard
-// @updateURL    https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=1.5
-// @downloadURL  https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=1.5
+// @grant        GM_xmlhttpRequest
+// @grant        GM_openInTab
+// @connect      raw.githubusercontent.com
+// @updateURL    https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=1.6
+// @downloadURL  https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js?v=1.6
 // ==/UserScript==
 
 (function () {
@@ -17,6 +20,46 @@
   // Auto-update: replace <USER>, <REPO>, and <BRANCH> in @updateURL/@downloadURL with your GitHub raw script URL.
   const TARGETS = ['cycle_sd_a', 'cycle_sd_b', 'cycle_sd_c', 'cycle_sd_d'];
   const ROOT_ID = 'cycle-sd-dot-root';
+  const UPDATE_URL = 'https://raw.githubusercontent.com/akshayparakh036-ctrl/SD_Table_CSV/refs/heads/main/cycle_sd_a_csv_diagnose.user.js';
+
+  function versionParts(v) {
+    return String(v || '0').split(/[.\-_]/).map(p => parseInt(p, 10) || 0);
+  }
+
+  function isNewerVersion(remote, current) {
+    const a = versionParts(remote);
+    const b = versionParts(current);
+    const len = Math.max(a.length, b.length);
+    for (let i = 0; i < len; i++) {
+      const x = a[i] || 0;
+      const y = b[i] || 0;
+      if (x !== y) return x > y;
+    }
+    return false;
+  }
+
+  // Force an update check on every page load instead of waiting for Tampermonkey's schedule.
+  function checkForUpdate() {
+    if (typeof GM_xmlhttpRequest !== 'function' || typeof GM_openInTab !== 'function') return;
+    const current = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '0';
+    GM_xmlhttpRequest({
+      method: 'GET',
+      url: UPDATE_URL + '?check=' + Date.now(),
+      headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+      timeout: 10000,
+      onload: function (res) {
+        if (!res || res.status !== 200 || !res.responseText) return;
+        const m = res.responseText.match(/^\/\/ @version\s+(\S+)/m);
+        if (!m) return;
+        const remote = m[1];
+        if (!isNewerVersion(remote, current)) return;
+        console.log(`[cycle_sd updater] New version ${remote} found (installed ${current}). Opening update page.`);
+        GM_openInTab(UPDATE_URL + '?v=' + encodeURIComponent(remote), { active: false });
+      },
+      onerror: function () {},
+      ontimeout: function () {},
+    });
+  }
 
   if (window.top !== window.self) return;
   if (document.getElementById(ROOT_ID)) return;
@@ -480,9 +523,14 @@
     document.documentElement.appendChild(root);
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', createDot, { once: true });
-  } else {
+  function boot() {
     createDot();
+    checkForUpdate();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot, { once: true });
+  } else {
+    boot();
   }
 })();
